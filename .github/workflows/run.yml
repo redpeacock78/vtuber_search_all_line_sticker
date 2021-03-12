@@ -1,0 +1,44 @@
+name: Nightly Release
+on:
+  repository_dispatch:
+  workflow_dispatch:
+  schedule:
+    - cron: 00 02 * * *
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Use Node.js
+        uses: actions/setup-node@v1
+        with:
+          node-version: '14'
+      - name: Setup Enviroments
+        run: ./.github/setup.sh
+      # Usage: ./.github/sticker.sh [SEARCH_WORD...]
+      #        ./.github/sticker.sh --author [AUTHOR_ID...]
+      - name: LINE Stickers Download
+        run: ./.github/sticker.sh ${{ secrets.SEARCH_WORDS }}
+      - name: Get Date
+        id: archive_date
+        run: echo "::set-output name=date::$(date '+%Y%m%d%H%M%S')"
+        env:
+          TZ: 'Asia/Tokyo'
+      - name: Archive Release
+        run: ./.github/archive.sh release-${{ steps.archive_date.outputs.date }}
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.archive_date.outputs.date }}
+          release_name: Release ${{ steps.archive_date.outputs.date }}
+          draft: false
+          prerelease: false
+      - name: Upload Release
+        uses: shogo82148/actions-upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: "release-${{ steps.archive_date.outputs.date }}*"
